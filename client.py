@@ -101,18 +101,22 @@ class Client:
 
     def gui_handler(self):
         self.root = tkinter.Tk()
+        self.root.configure(bg="gray")
 
         self.label = tk.Label(self.root, text="Chat:")
+        self.label.configure(bg="gray", font=("Arial", 15))
         self.label.pack(padx=5, pady=5)
 
         self.chat = tk.scrolledtext.ScrolledText(self.root)
         self.chat.pack(padx=5, pady=5)
-        self.chat.configure(state="disabled")
+        self.chat.configure(state="disabled", bg="lightgray", font=("TkDefaultFont", 14))
 
         self.entry_box = tk.Entry(self.root, width=WIDTH)
+        self.entry_box.configure(bg="lightgray")
         self.entry_box.pack()
 
         self.send_btn = tk.Button(self.root, text="Send", command=self.send)
+        self.send_btn.configure(bg="lightgray", font=("Arial", 15))
         self.send_btn.pack()
 
         self.root.protocol("WM_DELETE_WINDOW", self.disconnect)
