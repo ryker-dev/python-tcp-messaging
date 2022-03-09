@@ -1,138 +1,123 @@
-## Base for code taken from Tech With Tim
-
-import socket
+# Base for code taken from NeuralNine
 import pickle
-import re
-import threading
-import os
+import socket
 import sys
+import threading
 import tkinter as tk
-from tkinter import scrolledtext
+from tkinter import simpledialog
+import tkinter.scrolledtext
+from typing import Protocol
 
 HEADERLENGTH = 8
 PORT = 5000
+IP = socket.gethostbyname(socket.gethostname())
 FORMAT = 'utf-8'
-DISCONNECT_MESSAGE = "/disconnect"
 
 ## UI
 WIDTH = 160
 HEIGHT = 80
 
-def clear_terminal():
-    os.system('cls' if os.name == 'nt' else 'clear')
+class Client:
 
-def ask_name():
-    user = input("Username: ")
-    # TODO: Add sanitisation
-    clear_terminal()
-    return user
+    def __init__(self):
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-def ask_ip():
-    reg = "^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$"
-    ip = input("Server IP:")
-    ip = re.search(reg, ip)
-    if (ip):
-        ip = ip.string()
-    else:
-        ip = socket.gethostbyname(socket.gethostname())
+        msg = tkinter.Tk()
+        msg.withdraw()
 
-    port = input("Server port:")
-    port = re.search(reg, port)
-    
-    if (port):
-        port.string()
-    else:
-        port = PORT
+        self.server_ip = simpledialog.askstring("IP", "Enter the server IP", parent=msg) or IP
+        try:
+            self.server_port = int(simpledialog.askstring("port", "Enter the server port", parent=msg))
+        except ValueError:
+            self.server_port = PORT
 
-    return (ip, port)
+        self.username = simpledialog.askstring("username", "Username:", parent=msg)
 
-##################
+        try:
+            self.sock.connect((self.server_ip, self.server_port))
+            self.sock.send(self.serialise("start"))
+        except BaseException as err:
+            print(err)
 
-def connect():
-    address = ask_ip()
-    try:
-        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client.connect(address)
-        os.system('cls' if os.name == 'nt' else 'clear')
-        return client
-    except BaseException:
-        print("CONNECTION ERROR")
+        self.running = True
+        self.gui_done = False
 
-def disconnect(client, user):
-    # TODO: Add logging
-    client.close()
-    sys.exit(0)
+        gui_thread = threading.Thread(target=self.gui_handler)
+        receive_thread = threading.Thread(target=self.receive)
+        gui_thread.start()
+        self.receive()
 
-##################
+    def disconnect(self):
+        # TODO: Add logging
+        self.running = False
+        self.sock.close()
+        self.root.destroy()
+        sys.exit(0)
 
-def send(client, user, message):
-    p = {"username": user, "msg": message }
-    p = pickle.dumps(p)
+    def serialise(self, msg):
+        p = {"username": self.username, "msg": msg }
+        p = pickle.dumps(p)
+        print(msg)
 
-    msg_length = len(p)
-    msg = bytes(f'{msg_length:<{HEADERLENGTH}}', FORMAT) + p
+        msg_length = len(p)
+        return bytes(f'{msg_length:<{HEADERLENGTH}}', FORMAT) + p
 
-    client.send(msg)
-
-    if (message == DISCONNECT_MESSAGE):
-        disconnect(client, user)
-
-def receive(socket):
-    try:
-        msg_length = socket.recv(HEADERLENGTH).decode(FORMAT)
-        if (msg_length):
-            msg_length = int(msg_length)
-
-            data = socket.recv(msg_length)
-            p = pickle.loads(data)
-
-            username = p["username"]
-            msg = p["msg"]
-
-            print(f"\n{username}: {msg}")
-    except Exception:
-        pass
-
-##################
-
-def chat_handler(socket):
-    while True:
-        receive(socket)
-
-''' def create_ui(socket, user):
-    root = tk.Tk()
-    #canvas = tk.Canvas(root, width=WIDTH, height=HEIGHT)
-
-    label = tk.Label(root, text="Chat:")
-    label.pack(padx=5, pady=5)
-
-    chat = tk.scrolledtext.ScrolledText(root)
-    chat.pack(padx=5, pady=5)
-    chat.configure(state="disabled")
-
-    entry_box = tk.Entry(root, width=WIDTH)
-    entry_box.pack()
-
-    send_btn = tk.Button(root, text="Send", command=send(socket, user, entry_box.get()))
-    send_btn.pack()
-
-    ##root.protocol("WM_DELETE_WINDOW", disconnect(socket, user))
-
-    root.mainloop() '''
-
-def start():
-    socket = connect()
-    user = ask_name()
-    send(socket, user, "")
-
-    thread = threading.Thread(target=chat_handler, args=(socket,))
-    thread.start()
-
-    while socket:
-        msg = input(f"{user}: ")
-        send(socket, user, msg)
+    def send(self):
+        msg = self.serialise(self.entry_box.get())
         
-    #create_ui(socket, user)
-    
+        print(self.sock)
+        self.sock.send(msg)
+        self.entry_box.delete(0, 'end')
 
-start()
+    '''         if (message == DISCONNECT_MESSAGE):
+            disconnect(client, user) '''
+
+    def receive(self):
+        while self.running:
+            try:
+                msg_length = self.sock.recv(HEADERLENGTH).decode(FORMAT)
+                if (msg_length):
+                    msg_length = int(msg_length)
+
+                    data = self.sock.recv(msg_length)
+                    p = pickle.loads(data)
+
+                    print(p)
+                    username = p["username"]
+                    msg = p["msg"]
+
+                    if (self.gui_done):
+                        self.chat.config(state="normal")
+                        self.chat.insert("end", f"{username}: {msg}\n")
+                        self.chat.yview("end")
+                        self.chat.config(state="disabled")
+
+                    print(f"\n{username}: {msg}")
+            except ConnectionAbortedError:
+                break
+            except Exception as err:
+                print(err)
+                self.sock.close()
+
+    def gui_handler(self):
+        self.root = tkinter.Tk()
+
+        self.label = tk.Label(self.root, text="Chat:")
+        self.label.pack(padx=5, pady=5)
+
+        self.chat = tk.scrolledtext.ScrolledText(self.root)
+        self.chat.pack(padx=5, pady=5)
+        self.chat.configure(state="disabled")
+
+        self.entry_box = tk.Entry(self.root, width=WIDTH)
+        self.entry_box.pack()
+
+        self.send_btn = tk.Button(self.root, text="Send", command=self.send)
+        self.send_btn.pack()
+
+        self.root.protocol("WM_DELETE_WINDOW", self.disconnect)
+
+        self.gui_done = True
+        self.root.mainloop()
+
+Client()
