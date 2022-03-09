@@ -8,7 +8,6 @@ import os
 import sys
 import tkinter as tk
 from tkinter import scrolledtext
-from venv import create
 
 HEADERLENGTH = 8
 PORT = 5000
