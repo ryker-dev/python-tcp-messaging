@@ -17,7 +17,7 @@ server = socket.socket(socket.AF_INET, socket.SOCK_STREAM) ##IPV4 TCP
 server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 server.bind(ADDRESS)
 
-SOCKET_LIST = [server]
+SOCKET_LIST = []
 CLIENTS = {}
 
 def send(client, user, message):
@@ -51,15 +51,13 @@ def receive(client_socket):
                 return p
                 ##client_socket.send("Msg received".encode(FORMAT))
     except socket.error:
-        #getpeername()
-        print(f"[CONNECTION] {client_socket.getpeername()[0]} disconnected unexpectedly")
         return None
 
 def get_name(client_socket):
     data = receive(client_socket)
     try:
         user = data["username"]
-
+        
         if (user in CLIENTS.keys()):
             send(client_socket, SERVER_NAME, "Username is already taken")
             return None
@@ -72,9 +70,12 @@ def get_name(client_socket):
     except Exception:
         send(client_socket, SERVER_NAME, "GENERIC ERROR")
 
+def command_parser(p):
+    pass
+
 def client_thread(client_socket, addr):
     print(f"[CONNECTION] Client {addr[0]} connected")
-    print(f"[STATUS] Client connections: {threading.active_count() - 1}") #Fix bad counter
+    print(f"[STATUS] Client connections: {SOCKET_LIST - 1}") #Fix bad counter
 
     user = get_name(client_socket)
 
@@ -82,20 +83,25 @@ def client_thread(client_socket, addr):
     send(client_socket, SERVER_NAME, f"Welcome to {SERVER_NAME}")
     ##
 
+    propagate(SOCKET_LIST, "SERVER", f"{user} joined")
+
     connected = True
     while connected:
-        p = receive(client_socket)
-        if (not p):
+        try:
+            p = receive(client_socket)
+            msg = p["msg"]
+            if (msg == DISCONNECT_MESSAGE):
+                connected = False
+            elif (msg[0:1] == "/"):
+                command_parser(p)
+            elif (len(msg) > 0):
+                propagate(SOCKET_LIST, p["username"], p["msg"])
+                print("{}: {}".format(p["username"], p["msg"]))
+        except Exception:
             connected = False
-        else:
-            l = SOCKET_LIST.copy()
-            l.remove(client_socket)
-            l.remove(server)
-            print(l)
-            propagate(l, p["username"], p["msg"])
-            print("{}: {}".format(p["username"], p["msg"]))
-
     print(f"[CONNECTION] {client_socket.getpeername()[0]} disconnected")
+    SOCKET_LIST.remove(client_socket)
+    propagate(SOCKET_LIST, "SERVER", f"{user} disconnected")
     client_socket.close()
 
 def start():
