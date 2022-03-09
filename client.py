@@ -45,7 +45,7 @@ class Client:
         gui_thread = threading.Thread(target=self.gui_handler)
         receive_thread = threading.Thread(target=self.receive)
         gui_thread.start()
-        self.receive()
+        receive_thread.start()
 
     def disconnect(self):
         # TODO: Add logging

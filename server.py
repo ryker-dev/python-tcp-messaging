@@ -94,7 +94,7 @@ def client_thread(client_socket, addr):
     user = get_name(client_socket)
 
     ## MODT 
-    send(client_socket, SERVER_NAME, f"Welcome to {SERVER_NAME}")
+    send(client_socket, "SERVER", f"Welcome to {SERVER_NAME}")
     ##
 
     propagate(SOCKET_LIST, "SERVER", f"{user} joined")
