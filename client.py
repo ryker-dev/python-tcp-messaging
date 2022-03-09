@@ -46,6 +46,8 @@ def ask_ip():
 
     return (ip, port)
 
+##################
+
 def connect():
     address = ask_ip()
     try:
@@ -60,6 +62,8 @@ def disconnect(client, user):
     # TODO: Add logging
     client.close()
     sys.exit(0)
+
+##################
 
 def send(client, user, message):
     p = {"username": user, "msg": message }
@@ -85,9 +89,11 @@ def receive(socket):
             username = p["username"]
             msg = p["msg"]
 
-            print(f"{username}: {msg}")
+            print(f"\n{username}: {msg}")
     except Exception:
         pass
+
+##################
 
 def chat_handler(socket):
     while True:
