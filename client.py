@@ -5,18 +5,31 @@ import pickle
 import re
 import threading
 import os
+import sys
+import tkinter as tk
+from tkinter import scrolledtext
+from venv import create
 
 HEADERLENGTH = 8
 PORT = 5000
 FORMAT = 'utf-8'
 DISCONNECT_MESSAGE = "/disconnect"
 
+## UI
+WIDTH = 160
+HEIGHT = 80
+
+def clear_terminal():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
 def ask_name():
     user = input("Username: ")
+    # TODO: Add sanitisation
+    clear_terminal()
     return user
 
 def ask_ip():
-    reg = "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
+    reg = "^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$"
     ip = input("Server IP:")
     ip = re.search(reg, ip)
     if (ip):
@@ -24,7 +37,6 @@ def ask_ip():
     else:
         ip = socket.gethostbyname(socket.gethostname())
 
-    reg = "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
     port = input("Server port:")
     port = re.search(reg, port)
     
@@ -37,26 +49,18 @@ def ask_ip():
 
 def connect():
     address = ask_ip()
-    print("Connecting to server...")
     try:
         client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client.connect(address)
         os.system('cls' if os.name == 'nt' else 'clear')
         return client
-    except:
+    except BaseException:
         print("CONNECTION ERROR")
 
 def disconnect(client, user):
-    '''     msg_length = client.recv(HEADERLENGTH).decode(FORMAT)
-    if (msg_length):
-        msg_length = int(msg_length)
-
-    data = client.recv(msg_length)
-    p = pickle.loads(data)
-
-    print(p["msg"]) '''
-
+    # TODO: Add logging
     client.close()
+    sys.exit(0)
 
 def send(client, user, message):
     p = {"username": user, "msg": message }
@@ -70,8 +74,6 @@ def send(client, user, message):
     if (message == DISCONNECT_MESSAGE):
         disconnect(client, user)
 
-    ## print(client.recv(2048).decode(FORMAT)) ##Debug print
-
 def receive(socket):
     try:
         msg_length = socket.recv(HEADERLENGTH).decode(FORMAT)
@@ -83,16 +85,40 @@ def receive(socket):
 
             username = p["username"]
             msg = p["msg"]
-    except socket.error:
+
+            print(f"{username}: {msg}")
+    except Exception:
         pass
 
 def chat_handler(socket):
     while True:
         receive(socket)
 
+''' def create_ui(socket, user):
+    root = tk.Tk()
+    #canvas = tk.Canvas(root, width=WIDTH, height=HEIGHT)
+
+    label = tk.Label(root, text="Chat:")
+    label.pack(padx=5, pady=5)
+
+    chat = tk.scrolledtext.ScrolledText(root)
+    chat.pack(padx=5, pady=5)
+    chat.configure(state="disabled")
+
+    entry_box = tk.Entry(root, width=WIDTH)
+    entry_box.pack()
+
+    send_btn = tk.Button(root, text="Send", command=send(socket, user, entry_box.get()))
+    send_btn.pack()
+
+    ##root.protocol("WM_DELETE_WINDOW", disconnect(socket, user))
+
+    root.mainloop() '''
+
 def start():
-    user = ask_name()
     socket = connect()
+    user = ask_name()
+    send(socket, user, "")
 
     thread = threading.Thread(target=chat_handler, args=(socket,))
     thread.start()
@@ -100,6 +126,8 @@ def start():
     while socket:
         msg = input(f"{user}: ")
         send(socket, user, msg)
+        
+    #create_ui(socket, user)
     
 
 start()
