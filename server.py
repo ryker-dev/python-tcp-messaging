@@ -18,6 +18,7 @@ server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 server.bind(ADDRESS)
 
 SOCKET_LIST = []
+SOCKET_OWNERS = {}
 CLIENTS = {}
 
 def send(client, user, message):
@@ -63,6 +64,7 @@ def get_name(client_socket):
             return None
         ip = client_socket.getpeername()[0]
         CLIENTS[ip] = user
+        SOCKET_OWNERS[user] = client_socket
         print(f"[CONNECTION] {ip} connected as '{user}'")
         return user
     except KeyError:
@@ -70,12 +72,24 @@ def get_name(client_socket):
     except Exception:
         send(client_socket, SERVER_NAME, "GENERIC ERROR")
 
-def command_parser(p):
-    pass
+def command_parser(client_socket, p):
+    user = p["username"]
+    msg = p["msg"]
+    s = msg.split(" ", 2)
+    print(s)
+    if (s[0] == "/private"):
+        receiver = s[1]
+        try:
+            if (SOCKET_OWNERS.get(receiver)):
+                send(client_socket, user + " (p)", s[2])
+                send(SOCKET_OWNERS.get(receiver), user + " (p)", s[2])
+        except Exception as err:
+            print(err)
+            send(client_socket, "SERVER", f"No user named {receiver} exists")
 
 def client_thread(client_socket, addr):
     print(f"[CONNECTION] Client {addr[0]} connected")
-    print(f"[STATUS] Client connections: {SOCKET_LIST - 1}") #Fix bad counter
+    print(f"[STATUS] Client connections: {len(SOCKET_LIST) - 1}") #Fix bad counter
 
     user = get_name(client_socket)
 
@@ -93,14 +107,28 @@ def client_thread(client_socket, addr):
             if (msg == DISCONNECT_MESSAGE):
                 connected = False
             elif (msg[0:1] == "/"):
-                command_parser(p)
+                command_parser(client_socket, p)
             elif (len(msg) > 0):
                 propagate(SOCKET_LIST, p["username"], p["msg"])
                 print("{}: {}".format(p["username"], p["msg"]))
         except Exception:
             connected = False
-    print(f"[CONNECTION] {client_socket.getpeername()[0]} disconnected")
+
+    ip = client_socket.getpeername()[0]
+    print(f"[CONNECTION] {ip} disconnected")
     SOCKET_LIST.remove(client_socket)
+
+    ## implement better error handling in the future
+    try:
+        CLIENTS.pop(ip)
+    except KeyError:
+        pass
+    
+    try:
+        SOCKET_OWNERS.pop(user)
+    except KeyError:
+        pass
+
     propagate(SOCKET_LIST, "SERVER", f"{user} disconnected")
     client_socket.close()
 
